@@ -86,4 +86,65 @@ with career_tab:
 
 
 with resume_tab:
-    pass
+    st.header("Resume vs Job Description Matcher")
+    st.write("Compare your resume against a target job description to find skill gaps and tailor your bullet points.")
+
+    with st.form("resume_form"):
+        resume_input = st.text_area(
+            "Paste Your Resume Text", 
+            placeholder="Paste the plain text content of your resume here...",
+            height=200
+        )
+        job_desc_input = st.text_area(
+            "Paste Job Description", 
+            placeholder="Paste the target job description here...",
+            height=200
+        )
+
+        resume_submit_btn = st.form_submit_button(
+            "Analyze Match",
+            type="primary"
+        )
+
+    if resume_submit_btn:
+        if not resume_input.strip() or not job_desc_input.strip():
+            st.warning("Please provide both your resume text and the job description.")
+        else:
+            try:
+                with st.spinner("Analyzing resume against job description..."):
+                    match_result = analyze_resume_job(resume_input, job_desc_input)
+
+                st.success("Analysis Completed Successfully!")
+
+                st.subheader("Match Summary")
+                st.write(match_result.get("match_summary", "No summary provided."))
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("Matching Skills")
+                    matching = match_result.get("matching_skills", [])
+                    if matching:
+                        for item in matching:
+                            st.markdown(f"- ✅ {item}")
+                    else:
+                        st.info("No explicit matching skills found.")
+
+                    st.subheader("Resume Improvements")
+                    improvements = match_result.get("resume_improvements", [])
+                    if improvements:
+                        for item in improvements:
+                            st.markdown(f"- 💡 {item}")
+                    else:
+                        st.info("No specific improvements listed.")
+
+                with col2:
+                    st.subheader("Missing Skills / Requirements")
+                    missing = match_result.get("missing_skills", [])
+                    if missing:
+                        for item in missing:
+                            st.markdown(f"- ❌ {item}")
+                    else:
+                        st.info("No major missing skills identified!")
+
+            except Exception as ex:
+                st.error(f"Resume analysis failed: {ex}")
