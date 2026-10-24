@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from google import genai
+import json
 
 # Load environment variables from .env file
 # This allows us to keep sensitive configuration outside the Python source code
@@ -23,6 +24,46 @@ generation_config = {
     'thinking_level': 'medium',
 }
 
+
+# Define the exact JSON structure that Gemini must return
+career_analysis_schema = {
+    "type": "object",
+    "properties": {
+        "profile_summary": {
+            "type": "string",
+            "description": "A concise summary of the student's current profile"
+        },
+        "strengths": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Technical or career strengths identified from profile"
+        },
+        "skill_gaps": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Skills missing or insufficient for the target role"
+        },
+        "priority_skills": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Skills that student should prioritize"
+        },
+        "interview_topics": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Topics the student should prepare for interviews"
+        }
+    }
+}
+
 student_name = input("Student name: ")
 education = input("Education: ")
 skills = input("Your current technical skills (comma separated) : ")
@@ -43,84 +84,169 @@ Projects: {projects}
 Experience/Internship: {experience}
 Target Job Role: {target_role}
 """
+def analyze_career(student_context):
+    # Prompt Engineering
+    career_prompt = f"""
+    ROLE:
+    You are CareerTwin, You are an AI career advisor for post-grad students
 
-# Prompt Engineering
-career_prompt = f"""
-ROLE:
-You are CareerTwin, You are an AI career advisor for post-grad students
+    OBJECTIVE:
+    Analyze the student's current profile against their target job role.
 
-OBJECTIVE:
-Analyze the student's current profile against their target job role.
+    ANALYSIS_REQUIREMENTS:
+    1. Profile Summary
+    - Summarize the student's current technical profile
 
-ANALYSIS_REQUIREMENTS:
-1. Profile Summary
-- Summarize the student's current technical profile
+    2. Strengths
+    - Identify skills, projects, education or experience that are relevant to the target role.
 
-2. Strengths
-- Identify skills, projects, education or experience that are relevant to the target role.
+    3. Skill gaps
+    - Identify important skills required for target role that are missing or insufficiently represented.
 
-3. Skill gaps
-- Identify important skills required for target role that are missing or insufficiently represented.
+    4. Priority Skills
+    - Select the most important missing skills that student should learn first.
 
-4. Priority Skills
-- Select the most important missing skills that student should learn first.
+    5. Interview Topics
+    - Identify technical topics the student should explore for the target role
 
-5. Interview Topics
-- Identify technical topics the student should explore for the target role
+    6. Recommendations
+    - Provide practical next steps for becoming job ready
 
-6. Recommendations
-- Provide practical next steps for becoming job ready
+    CONTEXT:
+    CareerTwin helps students understand software engineering career paths, required technical skills, learning priorities, projects and interview preparation.
 
-CONTEXT:
-CareerTwin helps students understand software engineering career paths, required technical skills, learning priorities, projects and interview preparation.
+    TASK:
+    Answer the student's career related question clearly and practically. Give revommendations that are relevant to the student's career goal
 
-TASK:
-Answer the student's career related question clearly and practically. Give revommendations that are relevant to the student's career goal
+    CONSTRAINTS:
+    - Do not provide unrelated information
+    - Do not assume skills that the stduent has not mentioned
+    - Prefer practical and actionable recommendations
+    - Keep the response concise and easy to understand
 
-CONSTRAINTS:
-- Do not provide unrelated information
-- Do not assume skills that the stduent has not mentioned
-- Prefer practical and actionable recommendations
-- Keep the response concise and easy to understand
+    {student_context}
 
-{student_context}
+    OUTPUT_FORMAT:
+    Profile Summary:
+    <summary>
 
-OUTPUT_FORMAT:
-Profile Summary:
-<summary>
+    Strengths:
+    - <strength>
+    - <strength>
 
-Strengths:
-- <strength>
-- <strength>
+    Skill Gaps:
+    - <skill>
+    - <skill>
 
-Skill Gaps:
-- <skill>
-- <skill>
+    Priority Skills:
+    1. <skill>
+    2. <skill>
+    3. <skill>
 
-Priority Skills:
-1. <skill>
-2. <skill>
-3. <skill>
+    Interview Topics:
+    - <topic>
+    - <topic>
 
-Interview Topics:
-- <topic>
-- <topic>
-
-Recommendations:
-1. <recommendation>
-2. <recommendation>
-3. <recommendation>
+    Recommendations:
+    1. <recommendation>
+    2. <recommendation>
+    3. <recommendation>
 
 
-STUDENT QUESTION:
-{user_input}
+    STUDENT QUESTION:
+    {user_input}
+    """
+
+    # Send our request to Gemini.
+    response = client.interactions.create(
+        model = gemini_model,
+        input = career_prompt,
+        generation_config=generation_config,
+        response_format={
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": career_analysis_schema
+        }
+    )
+    return json.loads(response.output_text)
+
+def analyze_resume_job(resume_text, job_description):
+    """
+    Compare student's resume with a target job description
+    """
+    resume_jd_schema = {
+        "type": "object",
+        "properties": {
+            "match_summary": {
+                "type": "string",
+                "description": "A concise assessment of resume alignment"
+            },
+            "matching_skills": {
+                "type": "array",
+                "items": {"type":"string"},
+                "description": "Job requirements supported by resume evidence"
+            },
+            "missing_skills": {
+                "type": "array",
+                "items": {"type":"string"},
+                "description": "Requirements not demonstrated in the resume"
+            },
+            "resume_improvements": {
+                "type": "array",
+                "items": {"type":"string"},
+                "description": "Specific, truthful resume improvements"
+            }
+        }
+    }
+
+    prompt = f"""
+    ROLE:
+    You are careertwin, an AI resume and job-description analyst.
+    
+    TASK:
+    Compare the resume agains the job description
+
+    RULES:
+    - Use only evidence present in the supplied resume and job description
+    - Do not invent qualification, projects or experience
+    - Distinguish a missing skill from a skill that is not mentioned
+    - Do not claim that your analysis gurantees an interview or job
+    - Keep recommendations specific and actionable
+
+    RESUME:
+    {resume_text}
+
+    JOB DESCRIPTION
+    {job_description}
 """
 
-# Send our request to Gemini.
-response = client.interactions.create(
-    model = gemini_model,
-    input = career_prompt,
-    generation_config=generation_config,
-)
-print("==== GEMINI ====")
-print(response.output_text)
+    # Send our request to Gemini.
+    response = client.interactions.create(
+        model = gemini_model,
+        input = prompt,
+        generation_config=generation_config,
+        response_format={
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": resume_jd_schema
+        }
+    )
+
+    return json.loads(response.output_text)    
+
+
+print("==== CAREERTWIN CAREER ANALYSIS ====")
+# print(response.output_text)
+career_analysis = analyze_career(student_context)
+
+print("PROFILE SUMMARY")
+print(career_analysis["profile_summary"])
+clea
+# Collect resume and job description text
+resume_text = input("Paste resume text: ")
+job_description = input("Paste Job Description: ")
+
+result = analyze_resume_job(resume_text, job_description)
+
+print("SUMMARY")
+print(result["match_summary"])

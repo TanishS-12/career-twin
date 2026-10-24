@@ -29,3 +29,13 @@ Module-2: Prompt Engineering
 -Gnerate Interview Questions for a paritcular JD
 
 Finally show output on UI -> Streamlit
+
+
+===============================
+
+Return Structured JSON
+
+
+
+===============================
+Convert career-twin into reusable logic
